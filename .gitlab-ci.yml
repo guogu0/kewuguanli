@@ -13,7 +13,7 @@ variables:
 build-v5env-run:
   stage: package
   tags:
-    - 151-run
+    - 152-run
   script:
     - chmod +x updaterun.sh
     - ./updaterun.sh
