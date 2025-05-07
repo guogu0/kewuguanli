@@ -1,23 +1,96 @@
 stages:
+  - package
   - build
   - deploy
+  - run
 
-build:
+variables:
+  DOCKER_REGISTRY_DEV: 192.168.1.160:5000
+  IMAGE_NAME_DEV: Teaching-Assistant-dev
+  DOCKER_REGISTRY_PRD: 111.231.240.168:5000
+  IMAGE_NAME_PRD: Teaching-Assistant-prd
+
+# 1. 运行脚本（main分支，run目录有变动时）
+build-v5env-run:
+  stage: package
+  tags:
+    - 151-run
+  script:
+    - chmod +x updaterun.sh
+    - ./updaterun.sh
+  only:
+    refs:
+      - main
+    changes:
+      - run/**/*
+
+# 2. 构建测试环境镜像
+test-build:
   stage: build
-  image: node:latest
+  tags:
+    - 152-run
   script:
-    - npm install
-    - npm run build
-  artifacts:
-    paths:
-      - dist/
-
-deploy:
-  stage: deploy
-  script:
-    - mv dist public
-  artifacts:
-    paths:
-      - public
+    - docker build -t ${DOCKER_REGISTRY_DEV}/${IMAGE_NAME_DEV}:latest -f ./ci/test/Dockerfile .
+    - docker push ${DOCKER_REGISTRY_DEV}/${IMAGE_NAME_DEV}:latest
   only:
     - main
+
+# 3. 运行测试环境镜像
+test-run:
+  stage: run
+  tags:
+    - 152-run
+  script:
+    - docker pull ${DOCKER_REGISTRY_DEV}/${IMAGE_NAME_DEV}:latest
+    - docker-compose -f ./ci/test/docker-compose.yml stop ${IMAGE_NAME_DEV}
+    - docker-compose -f ./ci/test/docker-compose.yml up -d ${IMAGE_NAME_DEV}
+  only:
+    - main
+  dependencies:
+    - test-build
+
+# 4. 构建并推送生产环境镜像
+push-prod:
+  stage: package
+  tags:
+    - 152-run
+  script:
+    - docker build -t ${DOCKER_REGISTRY_PRD}/${IMAGE_NAME_PRD} -f ./ci/production/Dockerfile .
+    - docker login -u basejy -p basejy-2020 ${DOCKER_REGISTRY_PRD}
+    - docker push ${DOCKER_REGISTRY_PRD}/${IMAGE_NAME_PRD}
+    - docker logout ${DOCKER_REGISTRY_PRD}
+  only:
+    - main
+  environment:
+    name: productenv
+
+# 5. 生产环境触发部署
+deploy-prod:
+  variables:
+    TRIGGER_TYPE: runfold
+  stage: deploy
+  trigger: maintaingroup/v5env-formal
+  only:
+    refs:
+      - main
+    changes:
+      - run/**/*
+
+# 6. 生产环境触发器
+run-prod-trigger:
+  variables:
+    TRIGGER_MODULE: membership-management
+    TRIGGER_ENV: prod
+  stage: run
+  trigger: maintaingroup/v5env-formal
+  only:
+    - main
+ ./ci/test/docker-compose.yml
+run-prod-trigger:
+  variables:
+    TRIGGER_MODULE: membership-management
+    TRIGGER_ENV: prod
+  stage: run
+  trigger: maintaingroup/v5env-formal
+  only:
+    - main       
