@@ -10,7 +10,6 @@ variables:
   DOCKER_REGISTRY_PRD: 111.231.240.168:5000
   IMAGE_NAME_PRD: Teaching-Assistant-prd
 
-# 1. 运行脚本（main分支，run目录有变动时）
 build-v5env-run:
   stage: package
   tags:
@@ -24,7 +23,6 @@ build-v5env-run:
     changes:
       - run/**/*
 
-# 2. 构建测试环境镜像
 test-build:
   stage: build
   tags:
@@ -35,7 +33,6 @@ test-build:
   only:
     - main
 
-# 3. 运行测试环境镜像
 test-run:
   stage: run
   tags:
@@ -49,7 +46,6 @@ test-run:
   dependencies:
     - test-build
 
-# 4. 构建并推送生产环境镜像
 push-prod:
   stage: package
   tags:
@@ -64,7 +60,6 @@ push-prod:
   environment:
     name: productenv
 
-# 5. 生产环境触发部署
 deploy-prod:
   variables:
     TRIGGER_TYPE: runfold
@@ -76,21 +71,11 @@ deploy-prod:
     changes:
       - run/**/*
 
-# 6. 生产环境触发器
 run-prod-trigger:
   variables:
-    TRIGGER_MODULE: membership-management
+    TRIGGER_MODULE: Teaching-Assistant
     TRIGGER_ENV: prod
   stage: run
   trigger: maintaingroup/v5env-formal
   only:
     - main
- ./ci/test/docker-compose.yml
-run-prod-trigger:
-  variables:
-    TRIGGER_MODULE: membership-management
-    TRIGGER_ENV: prod
-  stage: run
-  trigger: maintaingroup/v5env-formal
-  only:
-    - main       
