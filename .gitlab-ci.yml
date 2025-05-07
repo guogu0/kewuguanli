@@ -1,46 +1,23 @@
 stages:
+  - build
   - deploy
 
-test-deploy:
-  stage: deploy
-  tags:
-    - fe-runner-146
+build:
+  stage: build
+  image: node:latest
   script:
-    - source /root/.nvm/nvm.sh
-    - nvm use 16.14.0
-    - pnpm install --no-frozen-lockfile
-    - pnpm build:test:personal
-    - ssh root@192.168.1.154 "rm -rf /root/web_home/kuaipk"
-    - scp -r dist "root@192.168.1.154:/root/web_home/kuaipk"
+    - npm install
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
 
-    - pnpm build:test:jw-intl
-    - ssh root@192.168.1.154 "rm -rf /root/web_home/jw-intl-kuaipk"
-    - scp -r dist "root@192.168.1.154:/root/web_home/jw-intl-kuaipk"
-
-    - pnpm build:test:jw-inland
-    - ssh root@192.168.1.154 "rm -rf /root/web_home/jw-inland-kuaipk"
-    - scp -r dist "root@192.168.1.154:/root/web_home/jw-inland-kuaipk"
-  rules:
-    - if: $CI_COMMIT_BRANCH == "test"
-
-prd-deploy:
+deploy:
   stage: deploy
-  tags:
-    - fe-runner-146
   script:
-    - source /root/.nvm/nvm.sh
-    - nvm use 16.14.0
-    - pnpm install --no-frozen-lockfile
-    - pnpm build:prd:personal
-    - ssh root@118.89.62.132 -p 10522 "rm -rf /www/v5/kuaipk"
-    - scp -P 10522 -r dist "root@118.89.62.132:/www/v5/kuaipk"
-
-    - pnpm build:prd:jw-intl
-    - ssh root@118.89.62.132 -p 10522 "rm -rf /www/v5/jw-intl-kuaipk"
-    - scp -P 10522 -r dist "root@118.89.62.132:/www/v5/jw-intl-kuaipk"
-
-    - pnpm build:prd:jw-inland
-    - ssh root@118.89.62.132 -p 10522 "rm -rf /www/v5/jw-inland-kuaipk"
-    - scp -P 10522 -r dist "root@118.89.62.132:/www/v5/jw-inland-kuaipk"
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+    - mv dist public
+  artifacts:
+    paths:
+      - public
+  only:
+    - main
