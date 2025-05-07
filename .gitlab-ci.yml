@@ -1,81 +1,32 @@
 stages:
-  - package
   - build
   - deploy
-  - run
 
-variables:
-  DOCKER_REGISTRY_DEV: 192.168.1.160:5000
-  IMAGE_NAME_DEV: Teaching-Assistant-dev
-  DOCKER_REGISTRY_PRD: 111.231.240.168:5000
-  IMAGE_NAME_PRD: Teaching-Assistant-prd
-
-build-v5env-run:
-  stage: package
-  tags:
-    - 152-run
-  script:
-    - chmod +x updaterun.sh
-    - ./updaterun.sh
-  only:
-    refs:
-      - main
-    changes:
-      - run/**/*
-
-test-build:
+build:
   stage: build
   tags:
     - 152-run
+  image: node:18
   script:
-    - docker build -t ${DOCKER_REGISTRY_DEV}/${IMAGE_NAME_DEV}:latest -f ./ci/test/Dockerfile .
-    - docker push ${DOCKER_REGISTRY_DEV}/${IMAGE_NAME_DEV}:latest
+    - npm install
+    - npm run build
+  artifacts:
+    paths:
+      - build
+    expire_in: 1 hour
   only:
     - main
 
-test-run:
-  stage: run
+deploy:
+  stage: deploy
   tags:
     - 152-run
+  image: node:18
+  before_script:
+    - apt-get update && apt-get install -y sshpass
   script:
-    - docker pull ${DOCKER_REGISTRY_DEV}/${IMAGE_NAME_DEV}:latest
-    - docker-compose -f ./ci/test/docker-compose.yml stop ${IMAGE_NAME_DEV}
-    - docker-compose -f ./ci/test/docker-compose.yml up -d ${IMAGE_NAME_DEV}
+    - sshpass -p 'your_password' scp -o StrictHostKeyChecking=no -r build/* root@11.231.240.168:/var/www/html/
   only:
     - main
   dependencies:
-    - test-build
-
-push-prod:
-  stage: package
-  tags:
-    - 152-run
-  script:
-    - docker build -t ${DOCKER_REGISTRY_PRD}/${IMAGE_NAME_PRD} -f ./ci/production/Dockerfile .
-    - docker login -u basejy -p basejy-2020 ${DOCKER_REGISTRY_PRD}
-    - docker push ${DOCKER_REGISTRY_PRD}/${IMAGE_NAME_PRD}
-    - docker logout ${DOCKER_REGISTRY_PRD}
-  only:
-    - main
-  environment:
-    name: productenv
-
-deploy-prod:
-  variables:
-    TRIGGER_TYPE: runfold
-  stage: deploy
-  trigger: maintaingroup/v5env-formal
-  only:
-    refs:
-      - main
-    changes:
-      - run/**/*
-
-run-prod-trigger:
-  variables:
-    TRIGGER_MODULE: Teaching-Assistant
-    TRIGGER_ENV: prod
-  stage: run
-  trigger: maintaingroup/v5env-formal
-  only:
-    - main
+    - build
