@@ -8,9 +8,9 @@ stages:
 
 variables:
   DOCKER_REGISTRY_DEV: 192.168.1.160:5000
-  IMAGE_NAME_DEV: Teaching-Assistant-dev
+  IMAGE_NAME_DEV: teaching-assistant-dev
   DOCKER_REGISTRY_PRD: 111.231.240.168:5000
-  IMAGE_NAME_PRD: Teaching-Assistant-prd
+  IMAGE_NAME_PRD: teaching-assistant-prd
 
 build-v5env-run:
   stage: package
@@ -75,7 +75,7 @@ deploy-prod:
 
 run-prod-trigger:
   variables:
-    TRIGGER_MODULE: Teaching-Assistant
+    TRIGGER_MODULE: teaching-assistant
     TRIGGER_ENV: prod
   stage: run
   trigger: maintaingroup/v5env-formal
