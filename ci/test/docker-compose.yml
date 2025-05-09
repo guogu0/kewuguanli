@@ -1,0 +1,8 @@
+version: '3'
+
+services:
+  teaching-assistant-dev:
+    image: ${DOCKER_REGISTRY_DEV}/${IMAGE_NAME_DEV}:latest
+    ports:
+      - "8080:80"
+    restart: always 
