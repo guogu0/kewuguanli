@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { DatePicker, Select, Table, Button, message, Space } from 'antd';
-import dayjs from 'dayjs';
+import { DatePicker, Select, Button, message, Space } from 'antd';
 import type { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
+import isBetween from 'dayjs/plugin/isBetween';
+dayjs.extend(isBetween);
+import './ScheduleQuery.css';
 
 interface ScheduleData {
   startTime: string;
@@ -23,7 +26,7 @@ interface ScheduleData {
 }
 
 const ScheduleQuery: React.FC = () => {
-  const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
+  const [weekRange, setWeekRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [selectedTeacher, setSelectedTeacher] = useState<string>('');
   const [schedule, setSchedule] = useState<ScheduleData[]>([]);
   const [teachers, setTeachers] = useState<string[]>([]);
@@ -32,105 +35,115 @@ const ScheduleQuery: React.FC = () => {
   useEffect(() => {
     const data = localStorage.getItem('courseData');
     if (data) {
-      const courseData = JSON.parse(data);
+      const courseData = JSON.parse(data).filter((item: any) => item.actualTeacher && item.actualTeacher.trim() !== '');
       const uniqueTeachers = Array.from(new Set(courseData.map((item: any) => item.actualTeacher))).filter(teacher => typeof teacher === 'string') as string[];
       setTeachers(uniqueTeachers);
     }
   }, []);
 
   const handleQuery = () => {
-    if (!selectedDate) {
-      message.warning('请选择日期');
+    if (!weekRange || weekRange.length !== 2) {
+      message.warning('请选择一周的起止日期');
       return;
     }
     if (!selectedTeacher) {
       message.warning('请选择教师');
       return;
     }
-
-    // 重置表格显示状态
     setShowTable(false);
     setSchedule([]);
-
     const data = localStorage.getItem('courseData');
     if (data) {
-      const courseData = JSON.parse(data);
+      const courseData = JSON.parse(data).filter((item: any) => item.actualTeacher && item.actualTeacher.trim() !== '');
       const filteredData = courseData.filter((item: any) => {
-        // 解析日期字符串 'M/D/YY' 格式
         const parseDate = (dateStr: string) => {
           const [month, day, year] = dateStr.split('/').map(Number);
           const fullYear = 2000 + year;
           return dayjs(`${fullYear}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`);
         };
-        
         const courseDate = parseDate(item.date);
-        const selectedDateStr = selectedDate.format('YYYY-MM-DD');
-        const courseDateStr = courseDate.format('YYYY-MM-DD');
-        
-        console.log('Date comparison:', {
-          courseDate: courseDateStr,
-          selectedDate: selectedDateStr,
-          isMatch: courseDateStr === selectedDateStr
-        });
-        
-        return courseDateStr === selectedDateStr && 
+        return courseDate.isBetween(weekRange[0], weekRange[1], 'day', '[]') &&
                item.actualTeacher === selectedTeacher;
       });
-
-      const formattedData = filteredData.map((item: any) => ({
-        date: item.date,
-        startTime: item.startTime,
-        endTime: item.endTime,
-        week: item.week,
-        weekday: item.weekday,
-        session: item.session,
-        period: item.period,
-        grade: item.grade,
-        class: item.class,
-        subject: item.subject,
-        courseType: item.courseType,
-        hours: item.hours,
-        plannedTeacher: item.plannedTeacher,
-        actualTeacher: item.actualTeacher,
-        type: item.type,
-        reason: item.reason
-      }));
-
-      setSchedule(formattedData);
+      setSchedule(filteredData);
       setShowTable(true);
-
-      if (formattedData.length === 0) {
-        message.info('该教师在所选日期没有课程安排');
+      if (filteredData.length === 0) {
+        message.info('该教师在所选周没有课程安排');
       }
     }
   };
 
-  const columns = [
-    { title: '上课日期', dataIndex: 'date', key: 'date' },
-    { title: '上课时间', dataIndex: 'startTime', key: 'startTime' },
-    { title: '下课时间', dataIndex: 'endTime', key: 'endTime' },
-    { title: '周次', dataIndex: 'week', key: 'week' },
-    { title: '星期', dataIndex: 'weekday', key: 'weekday' },
-    { title: '节次', dataIndex: 'session', key: 'session' },
-    { title: '时段', dataIndex: 'period', key: 'period' },
-    { title: '年级', dataIndex: 'grade', key: 'grade' },
-    { title: '班级', dataIndex: 'class', key: 'class' },
-    { title: '科目', dataIndex: 'subject', key: 'subject' },
-    { title: '课程类型', dataIndex: 'courseType', key: 'courseType' },
-    { title: '课时数', dataIndex: 'hours', key: 'hours' },
-    { title: '计划上课教师', dataIndex: 'plannedTeacher', key: 'plannedTeacher' },
-    { title: '实际上课教师', dataIndex: 'actualTeacher', key: 'actualTeacher' },
-    { title: '调代课类型', dataIndex: 'type', key: 'type' },
-    { title: '调代课事由', dataIndex: 'reason', key: 'reason' }
-  ];
+  const daysOfWeek = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
+  const getCellContent = (weekday: string, session: string) => {
+    const found = schedule.find(item => item.weekday === weekday && item.session?.toString() === session.replace(/[^\d]/g, ''));
+    if (found) {
+      return (
+        <div>
+          <div style={{ fontWeight: 600 }}>{found.class}</div>
+          <div style={{ fontSize: 13 }}>{found.subject}</div>
+          <div style={{ fontSize: 12, color: '#888' }}>{found.courseType}</div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const getWeekDates = () => {
+    if (!weekRange || weekRange.length !== 2) return daysOfWeek.map(() => '');
+    const start = weekRange[0].startOf('day');
+    return daysOfWeek.map((_, idx) => start.add(idx, 'day').format('M月D日'));
+  };
+  const weekDates = getWeekDates();
+
+  // 新增：获取当前选中教师姓名
+  const teacherName = selectedTeacher || '';
+
+  // 统计本周所有课表数据（不只当前老师），每个时段下所有出现过的 session（节次），并去重、排序
+  const periodSessionFull = React.useMemo(() => {
+    const periodOrder = ['早晨', '上午', '下午', '晚上'];
+    // 统计所有课表数据
+    const data = localStorage.getItem('courseData');
+    let allData: ScheduleData[] = [];
+    if (data) {
+      allData = JSON.parse(data).filter((item: any) => item.actualTeacher && item.actualTeacher.trim() !== '');
+    }
+    // 按时段分组，收集所有节次
+    const map: Record<string, string[]> = {};
+    allData.forEach(item => {
+      if (!map[item.period]) {
+        map[item.period] = [];
+      }
+      map[item.period].push(item.session.toString());
+    });
+    // 排序节次（数字优先，非数字按原始顺序）
+    const sortSessions = (arr: string[]) => {
+      return Array.from(new Set(arr)).sort((a, b) => {
+        const na = Number(a), nb = Number(b);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        if (!isNaN(na)) return -1;
+        if (!isNaN(nb)) return 1;
+        return arr.indexOf(a) - arr.indexOf(b);
+      });
+    };
+    return periodOrder
+      .filter(period => map[period]?.length > 0)
+      .map(period => ({
+        period,
+        sessions: sortSessions(map[period]),
+      }));
+  }, [schedule]);
 
   return (
     <div>
       <Space style={{ marginBottom: '20px' }}>
-        <DatePicker
-          value={selectedDate}
-          onChange={setSelectedDate}
+        <DatePicker.RangePicker
+          value={weekRange}
+          onChange={dates => setWeekRange(dates as [Dayjs, Dayjs])}
           style={{ marginRight: '16px' }}
+          allowClear={false}
+          format="YYYY-MM-DD"
+          placeholder={["选择周一", "选择周日"]}
+          disabledDate={current => current && current.day() !== 1 && current.day() !== 0}
         />
         <Select
           value={selectedTeacher}
@@ -150,17 +163,51 @@ const ScheduleQuery: React.FC = () => {
       </Space>
 
       {showTable && (
-        <Table
-          dataSource={schedule}
-          columns={columns}
-          rowKey={(record) => `${record.date}-${record.startTime}-${record.endTime}-${record.session}-${record.class}-${record.subject}`}
-          scroll={{ x: 'max-content' }}
-          pagination={{
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 条记录`,
-          }}
-        />
+        <div className="schedule-table-wrapper">
+          <table className="schedule-table">
+            <thead>
+              <tr>
+                <th colSpan={2} style={{ textAlign: 'center', fontWeight: 700, fontSize: 16 }}>{teacherName}</th>
+                {daysOfWeek.map((day, idx) => (
+                  <th key={day}>
+                    <div>{day}</div>
+                    <div style={{fontSize:12, color:'#888', fontWeight:400}}>{weekDates[idx]}</div>
+                  </th>
+                ))}
+              </tr>
+              <tr>
+                <th style={{width: 80}}>时段</th>
+                <th style={{width: 80}}>节次</th>
+                {daysOfWeek.map((_, idx) => <th key={idx}></th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {periodSessionFull.map(periodObj => (
+                periodObj.sessions.map((session, sessionIdx) => (
+                  <tr key={periodObj.period + session}>
+                    {sessionIdx === 0 && (
+                      <td rowSpan={periodObj.sessions.length} style={{fontWeight: 600, background: '#f3f6fa'}}>{periodObj.period}</td>
+                    )}
+                    <td>{session}</td>
+                    {daysOfWeek.map(day => {
+                      const found = schedule.find(item => item.weekday === day && item.period === periodObj.period && item.session.toString() === session);
+                      return (
+                        <td key={day + periodObj.period + session}>
+                          {found ? (
+                            <div>
+                              <div style={{ fontWeight: 600 }}>{found.subject}</div>
+                              <div style={{ fontSize: 13 }}>{found.class}</div>
+                            </div>
+                          ) : null}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

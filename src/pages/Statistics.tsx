@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DatePicker, Select, Table, Card, Row, Col, Button, message } from 'antd';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
+import * as XLSX from 'xlsx';
 
 const { RangePicker } = DatePicker;
 
@@ -299,11 +300,19 @@ const Statistics: React.FC = () => {
     <div>
       <Button
         type="primary"
-        href="/课时导入模版.xlsx"
-        download="课时导入模版.xlsx"
-        style={{ marginBottom: 16 }}
+        style={{ marginBottom: 16, marginRight: 16 }}
+        onClick={() => {
+          if (!statistics || statistics.length === 0) {
+            message.warning('没有可导出的数据');
+            return;
+          }
+          const ws = XLSX.utils.json_to_sheet(statistics);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, '课时统计');
+          XLSX.writeFile(wb, '课时统计.xlsx');
+        }}
       >
-        下载模版
+        导出数据
       </Button>
       <Card title="统计条件" style={{ marginBottom: '20px' }}>
         <Row gutter={16}>
